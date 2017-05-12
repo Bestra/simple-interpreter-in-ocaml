@@ -1,5 +1,6 @@
 type t = Integer of int
        | Plus
+       | Minus
        | Whitespace
        | EOF
        | Unknown of char
@@ -8,6 +9,7 @@ let to_string token =
   match token with
   | Integer i -> (string_of_int i)
   | Plus -> "+"
+  | Minus -> "-"
   | Whitespace -> " "
   | EOF -> ""
   | Unknown c -> Char.escaped c
@@ -20,9 +22,16 @@ let is_digit = function
 let of_char = function
   | c when is_digit c -> Integer (int_of_string (Char.escaped c))
   | '+' -> Plus
+  | '-' -> Minus
   | ' ' -> Whitespace
   | _ as c -> Unknown c
 
+let remove_whitespace tokens =
+  List.filter
+    (fun x -> match x with
+       | Whitespace -> false
+       | _ -> true)
+    tokens
 
 let rec parse_integer int_str chars =
   match chars with

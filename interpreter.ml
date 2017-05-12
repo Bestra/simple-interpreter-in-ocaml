@@ -1,14 +1,14 @@
 open Core.Std
 
 let run_expr tokens =
-  let sans_whitespace = List.filter ~f:(fun x -> match x with
-      | Token.Whitespace -> false
-      | _ -> true) tokens in
-  match sans_whitespace with
-  | Token.Integer a :: Token.Plus :: Token.Integer b :: _ ->
+  match Token.remove_whitespace(tokens) with
+  | Token.Integer a :: operator :: Token.Integer b :: _ ->
     printf "a is %i, b is %i" a b;
     print_newline ();
-    a + b
+    (match operator with
+    | Token.Plus -> a + b
+    | Token.Minus -> a - b
+    | _ -> 0)
   | _ -> 0
 
 let rec build_expr tokens chars =
