@@ -1,6 +1,12 @@
+module Operator = struct
+  type t = Plus | Minus
+  let to_string = function
+    | Plus -> "+"
+    | Minus -> "-"
+end
+
 type t = Integer of int
-       | Plus
-       | Minus
+       | Operator of Operator.t
        | Whitespace
        | EOF
        | Unknown of char
@@ -8,8 +14,7 @@ type t = Integer of int
 let to_string token =
   match token with
   | Integer i -> (string_of_int i)
-  | Plus -> "+"
-  | Minus -> "-"
+  | Operator o -> (Operator.to_string o)
   | Whitespace -> " "
   | EOF -> ""
   | Unknown c -> Char.escaped c
@@ -21,8 +26,8 @@ let is_digit = function
 
 let of_char = function
   | c when is_digit c -> Integer (int_of_string (Char.escaped c))
-  | '+' -> Plus
-  | '-' -> Minus
+  | '+' -> Operator Operator.Plus
+  | '-' -> Operator Operator.Minus
   | ' ' -> Whitespace
   | _ as c -> Unknown c
 

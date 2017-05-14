@@ -1,14 +1,26 @@
 open Core.Std
 
-let run_expr tokens =
+let perform_op a op b =
+  match op with
+  | Token.Operator.Plus -> a + b
+  | Token.Operator.Minus -> a - b
+
+(* valid cases: Some op, next token is integer
+                No op, next token is Operator *)
+let rec eval_expr accum op tokens =
+  match tokens with
+  | [] -> accum
+  | hd :: tl ->
+    match (op, hd) with
+    | (Some o, Token.Integer i) ->
+      eval_expr (perform_op accum o i) None tl
+    | (None, Token.Operator o) ->
+      eval_expr accum (Some o) tl
+    | _ -> eval_expr accum op tl
+
+let  evaluate_expr tokens =
   match Token.remove_whitespace(tokens) with
-  | Token.Integer a :: operator :: Token.Integer b :: _ ->
-    printf "a is %i, b is %i" a b;
-    print_newline ();
-    (match operator with
-    | Token.Plus -> a + b
-    | Token.Minus -> a - b
-    | _ -> 0)
+  | Token.Integer i :: Token.Operator o :: tl -> eval_expr i (Some o) tl
   | _ -> 0
 
 let rec build_expr tokens chars =
@@ -19,7 +31,7 @@ let rec build_expr tokens chars =
     build_expr (List.append tokens [new_token]) remaining_chars
 
 let expr text =
-  let result = run_expr (build_expr [] text) in
+  let result = evaluate_expr (build_expr [] text) in
   printf "%i" result;
   print_newline ()
 
