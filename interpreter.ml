@@ -23,15 +23,8 @@ let  evaluate_expr tokens =
   | Token.Integer i :: Token.Operator o :: tl -> eval_expr i (Some o) tl
   | _ -> Error "syntax error in tokens. try again"
 
-let rec build_expr tokens chars =
-  match chars with
-  | [] -> tokens
-  | _ ->
-    let (new_token, remaining_chars) = Token.parse chars in
-    build_expr (List.append tokens [new_token]) remaining_chars
-
-let expr text =
-  match evaluate_expr (build_expr [] text) with
+let expr tokens =
+  match evaluate_expr tokens with
   | Ok result ->
     printf "%i" result;
     print_newline ()
@@ -39,11 +32,10 @@ let expr text =
     printf "%s" e;
     print_newline ()
 
-
 let interpret text =
   printf "you input %s" text;
   print_newline ();
-  expr (String.to_list text)
+  expr (Token.remove_whitespace (Lexer.tokenize text))
 
 let rec read_and_interpret () =
   let line = In_channel.input_line In_channel.stdin in
