@@ -1,8 +1,10 @@
 module Operator = struct
-  type t = Plus | Minus
+  type t = Plus | Minus | Mult | Div
   let to_string = function
     | Plus -> "+"
     | Minus -> "-"
+    | Mult -> "*"
+    | Div -> "/"
 end
 
 type t = Integer of int
@@ -28,6 +30,8 @@ let of_char = function
   | c when is_digit c -> Integer (int_of_string (Char.escaped c))
   | '+' -> Operator Operator.Plus
   | '-' -> Operator Operator.Minus
+  | '*' -> Operator Operator.Mult
+  | '/' -> Operator Operator.Div
   | ' ' -> Whitespace
   | _ as c -> Unknown c
 

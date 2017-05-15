@@ -4,20 +4,28 @@ let perform_op a op b =
   match op with
   | Token.Operator.Plus -> a + b
   | Token.Operator.Minus -> a - b
+  | Token.Operator.Mult -> a * b
+  | Token.Operator.Div -> a / b
 
-(* valid cases: Some op, next token is integer
-                No op, next token is Operator *)
+let is_term_op = function
+  | Token.Operator.Plus
+  | Token.Operator.Minus -> false
+  | Token.Operator.Mult
+  | Token.Operator.Div -> true
 
 let factor tokens =
   match tokens with
-  | Token.Integer i :: tl -> Ok (i, tl)
+  | Token.Integer i :: tl ->
+    printf "factor %i" i;
+    print_newline (); Ok (i, tl)
   | hd :: _ -> Error (Printf.sprintf "next token %s is not an integer" (Token.to_string hd))
   | [] -> Error "no remaining tokens to factor"
 
 let term tokens =
   let rec term' acc t =
     match t with
-    | Token.Operator o :: tl ->
+    | Token.Operator o :: tl when is_term_op o ->
+      printf "term op %s" (Token.Operator.to_string o); print_newline();
       (match factor tl with
        | Ok (next_factor_result, ts) ->
          term' (perform_op acc o next_factor_result) ts
@@ -32,7 +40,8 @@ let term tokens =
 let expr tokens =
   let rec expr' acc t =
     match t with
-    | Token.Operator o :: tl ->
+    | Token.Operator o :: tl when not (is_term_op o) ->
+      printf "expr op %s" (Token.Operator.to_string o); print_newline();
       (match term tl with
        | Ok (next_term_result, ts) ->
          expr' (perform_op acc o next_term_result) ts
