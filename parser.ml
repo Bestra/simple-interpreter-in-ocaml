@@ -6,8 +6,17 @@ let is_term_op = function
   | Token.Operator.Mult
   | Token.Operator.Div -> true
 
+(* 
+factor : (PLUS | MINUS) factor | INTEGER | LPAREN expr RPAREN
+*)
 let rec factor tokens =
   match tokens with
+  | Token.Operator o :: tl when not (is_term_op o) ->
+    (match factor tl with
+    | Ok (new_factor, ts) ->
+      Ok (Ast.UnaryOp (o, new_factor), ts)
+    | Error _ as e -> e
+    )
   | Token.Integer i as t :: tl ->
     printf "factor %i" i;
     print_newline (); Ok (Ast.Number (t, i), tl)
@@ -23,6 +32,9 @@ let rec factor tokens =
   | hd :: _ -> Error (Printf.sprintf "next token %s is not an integer" (Token.to_string hd))
   | [] -> Error "no remaining tokens to factor"
 
+(* 
+term : factor ((MUL | DIV) factor)*
+*)
 and term tokens =
   let term' node t =
     match t with
@@ -39,6 +51,9 @@ and term tokens =
   | Ok (n, t) -> term' n t
   | Error _ as e -> e
 
+(* 
+expr: term ((PLUS|MINUS) term)* 
+*)
 and expr tokens =
   let rec expr' node t =
     match t with

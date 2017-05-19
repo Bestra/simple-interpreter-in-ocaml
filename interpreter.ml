@@ -1,12 +1,5 @@
 open Core.Std
 
-let perform_op a op b =
-  match op with
-  | Token.Operator.Plus -> a + b
-  | Token.Operator.Minus -> a - b
-  | Token.Operator.Mult -> a * b
-  | Token.Operator.Div -> a / b
-
 let interpret text =
   printf "you input %s" text;
   print_newline ();
@@ -25,6 +18,17 @@ let rec eval ast =
        (eval l) * (eval r)
      | Token.Operator.Div ->
        (eval l) / (eval r)
+    )
+
+  | Ast.UnaryOp(t, l) ->
+    (match t with
+     | Token.Operator.Plus ->
+       eval l
+     | Token.Operator.Minus ->
+       -(eval l)
+     | Token.Operator.Mult | Token.Operator.Div ->
+       (* no op *)
+       eval l
     )
 
 let rec read_and_interpret () =
