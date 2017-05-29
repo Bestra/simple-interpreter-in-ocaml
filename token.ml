@@ -1,3 +1,4 @@
+open Core.Std
 module Operator = struct
   type t = Plus | Minus | Mult | Div
   let to_string = function
@@ -43,7 +44,7 @@ let of_char = function
 
 let remove_whitespace tokens =
   List.filter
-    (fun x -> match x with
+    ~f: (fun x -> match x with
        | Whitespace -> false
        | _ -> true)
     tokens

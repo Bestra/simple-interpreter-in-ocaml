@@ -7,7 +7,7 @@ let interpret text =
 
 let rec eval ast =
   match ast with
-  | Ast.Number(t, i) -> i
+  | Ast.Number(_, i) -> i
   | Ast.BinOp(t, l, r) ->
     (match t with
      | Token.Operator.Plus ->
