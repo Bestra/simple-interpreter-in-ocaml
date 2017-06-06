@@ -7,28 +7,28 @@ let interpret text =
 
 let rec eval ast =
   match ast with
-  | Ast.Number(_, i) -> i
-  | Ast.BinOp(t, l, r) ->
-    (match t with
+  | Ast.Number n -> n.value
+  | Ast.BinOp b ->
+    (match b.token with
      | Token.Operator.Plus ->
-       (eval l) + (eval r)
+       (eval b.left) + (eval b.right)
      | Token.Operator.Minus ->
-       (eval l) - (eval r)
+       (eval b.left) - (eval b.right)
      | Token.Operator.Mult ->
-       (eval l) * (eval r)
+       (eval b.left) * (eval b.right)
      | Token.Operator.Div ->
-       (eval l) / (eval r)
+       (eval b.left) / (eval b.right)
     )
 
-  | Ast.UnaryOp(t, l) ->
-    (match t with
+  | Ast.UnaryOp u ->
+    (match u.token with
      | Token.Operator.Plus ->
-       eval l
+       eval u.expr
      | Token.Operator.Minus ->
-       -(eval l)
+       -(eval u.expr)
      | Token.Operator.Mult | Token.Operator.Div ->
        (* no op *)
-       eval l
+       eval u.expr
     )
 
 let rec read_and_interpret () =

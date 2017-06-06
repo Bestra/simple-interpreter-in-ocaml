@@ -1,3 +1,5 @@
-type t = Number of Token.t * int | BinOp of Token.Operator.t * t * t | UnaryOp of Token.Operator.t * t
+type t = Number of {token: Token.t; value: int}
+       | BinOp of {token: Token.Operator.t; left: t; right: t}
+       | UnaryOp of {token: Token.Operator.t; expr: t}
 
 val to_string : t -> string
