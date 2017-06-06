@@ -14,6 +14,12 @@ type t = Integer of int
        | RParen
        | Whitespace
        | EOF
+       | Begin
+       | End
+       | Dot
+       | Assign
+       | Semi
+       | Id of string
        | Unknown of char
 
 let to_string token =
@@ -24,15 +30,16 @@ let to_string token =
   | RParen -> ")"
   | Whitespace -> " "
   | EOF -> ""
+  | Begin -> "BEGIN"
+  | End -> "END"
+  | Dot -> "."
+  | Assign -> ":="
+  | Semi -> ";"
+  | Id i -> i
   | Unknown c -> Char.escaped c
 
-let is_digit = function
-  | '1' | '2' | '3' | '4' | '5'
-  | '6' | '7' | '8' | '9' | '0' -> true
-  | _ -> false
-
 let of_char = function
-  | c when is_digit c -> Integer (int_of_string (Char.escaped c))
+  | '0'..'9' as c -> Integer (int_of_string (Char.escaped c))
   | '+' -> Operator Operator.Plus
   | '-' -> Operator Operator.Minus
   | '*' -> Operator Operator.Mult
