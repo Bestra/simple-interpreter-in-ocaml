@@ -147,11 +147,95 @@ let parseR = parseToken Token.RParen
 let parse_parens = andThen parseL parseR
 let parse_either = orElse parseL parseR
 
-(*
-factor : (PLUS | MINUS) factor | INTEGER | LPAREN expr RPAREN
-*)
+let empty tokens =
+  Ok(Ast.NoOp, tokens)
 
-let rec factor tokens =
+(*
+   statement: compound_statement | assignment_statement | empty
+*)
+let rec statement tokens =
+  match tokens with
+  | Token.Begin :: tl ->
+    compound_statement tokens
+  | Token.Id _ :: tl ->
+    assignment_statement tokens
+  | _ -> empty tokens
+
+(*
+statement_list : statement | statement SEMI statement_list
+*)
+and statement_list tokens =
+  let rec eat_list statements tokens =
+    match tokens with
+    | Token.Semi :: tl ->
+      (match statement tl with
+       | Ok (s, ts) -> eat_list (List.append statements [s]) ts
+       | Error _ as e -> e)
+    | _ -> Ok (statements, tokens)
+  in
+  match statement tokens with
+  | Ok (s, tl) ->
+    (match eat_list [s] tl with
+     | Ok (statements, ts) -> (match ts with
+         | Token.Id i :: _ -> Error "can't have an id after statements"
+         | _ -> Ok (statements, ts))
+     | Error _ as e -> e)
+  | Error _ as e -> e
+
+(*
+assignment_statement : variable ASSIGN expr
+*)
+and assignment_statement tokens =
+  match variable tokens with
+  | Ok (left, tl) ->
+    (match tl with
+     | Token.Assign as token :: _ ->
+       (match expr tl with
+        | Ok (right, tls) ->
+          Ok (Ast.Assign {left = left; right =  right; token = token}, tls)
+        | Error _ as e -> e)
+     | _ -> Error "variable needs to have an assign afterwards")
+  | Error _ as e -> e
+
+(*
+   variable: ID
+*)
+(* and variable tokens : (Ast.t * Token.t list, string) Core.Std.Result.t = *)
+and variable tokens =
+  match tokens with
+  | (Token.Id s as t) :: tl -> Ok (Ast.Var {token = t; value = s}, tl)
+  | _ -> Error "next token should be an Id"
+
+(*
+compound_statement : BEGIN statement_list END
+*)
+and compound_statement tokens =
+  match tokens with
+  | Token.Begin :: tl ->
+    (match statement_list tl with
+     | Ok (nodes, ts) -> (match ts with
+         | Token.End :: ts' ->
+           Ok (Ast.Compound {children = nodes}, ts')
+         | _ -> Error "compound statements must end with End")
+     | Error _ as e -> e)
+  | _ -> Error "compound statements must begin with Begin"
+(*
+program : compound_statement DOT
+*)
+and program tokens =
+  match compound_statement tokens with
+  | Ok(c, tl) -> (match tl with
+      | Token.Dot :: _ -> Ok (c, [])
+      | _ -> Error "Programs must end with a Dot")
+  | Error _ as e -> e
+
+(*
+factor : (PLUS | MINUS) factor
+        | INTEGER
+        | LPAREN expr RPAREN
+        | variable
+*)
+and factor tokens =
   match tokens with
   | Token.Operator o :: tl when not (is_term_op o) ->
     (match factor tl with
@@ -171,10 +255,11 @@ let rec factor tokens =
      | Ok (_, hd :: _) -> Error (Printf.sprintf "next token %s is not an right paren" (Token.to_string hd))
      | Ok (_, []) -> Error "The list of tokens is empty"
     )
-  | hd :: _ -> Error (Printf.sprintf "next token %s is not an integer" (Token.to_string hd))
+  | Token.Id _ :: _ -> variable tokens
+  | _ :: _ -> Error "next token is not part of a factor"
   | [] -> Error "no remaining tokens to factor"
 
-(* 
+(*
 term : factor ((MUL | DIV) factor)*
 *)
 and term tokens =
@@ -193,8 +278,8 @@ and term tokens =
   | Ok (n, t) -> term' n t
   | Error _ as e -> e
 
-(* 
-expr: term ((PLUS|MINUS) term)* 
+(*
+expr: term ((PLUS|MINUS) term)*
 *)
 and expr tokens =
   let rec expr' node t =
@@ -217,4 +302,4 @@ let parse text =
   printf "you input %s" text;
   print_newline ();
   let tokens = (Token.remove_whitespace (Lexer.tokenize text)) in
-  expr tokens
+  program tokens
