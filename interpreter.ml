@@ -16,9 +16,6 @@ let interpret text =
   print_newline ();
   Parser.parse text
 
-(*
-TODO: figure out what to do with symbols
-*)
 let rec visit ast (env: state) : state =
   match ast with
   | Ast.NoOp -> env
@@ -37,7 +34,7 @@ let rec visit ast (env: state) : state =
         in
         print_endline "merged symbols";
         print_endline (print_symbols new_symbols);
-        {accum = acc.accum; symbols = new_symbols}
+        {acc with symbols = new_symbols}
       )
 
   | Ast.Assign a ->
@@ -47,30 +44,25 @@ let rec visit ast (env: state) : state =
        let new_symbols = Map.add env.symbols ~key:v.value ~data:(new_state.accum) in
        print_endline "assign";
        print_endline (print_symbols new_symbols);
-       {accum = env.accum; symbols = new_symbols}
+       {env with symbols = new_symbols}
      | _ -> failwith "assigments must start with a variable"
     )
   | Ast.Var v ->
-    {accum = Map.find_exn env.symbols v.value; symbols = env.symbols}
-  | Ast.Number n -> {accum = n.value; symbols = env.symbols}
+    {env with accum = Map.find_exn env.symbols v.value}
+  | Ast.Number n -> {env with accum = n.value}
   | Ast.BinOp b ->
+    let l_e = (visit b.left env) in
+    let r_e = (visit b.right env) in
+    let new_syms = l_e.symbols in
     (match b.token with
      | Token.Operator.Plus ->
-       let l_e = (visit b.left env) in
-       let r_e = (visit b.right env) in
-       {accum = l_e.accum + r_e.accum; symbols = l_e.symbols}
+       {accum = l_e.accum + r_e.accum; symbols = new_syms}
      | Token.Operator.Minus ->
-       let l_e = (visit b.left env) in
-       let r_e = (visit b.right env) in
-       {accum = l_e.accum - r_e.accum; symbols = l_e.symbols}
+       {accum = l_e.accum - r_e.accum; symbols = new_syms}
      | Token.Operator.Mult ->
-       let l_e = (visit b.left env) in
-       let r_e = (visit b.right env) in
-       {accum = l_e.accum * r_e.accum; symbols = l_e.symbols}
+       {accum = l_e.accum * r_e.accum; symbols = new_syms}
      | Token.Operator.Div ->
-       let l_e = (visit b.left env) in
-       let r_e = (visit b.right env) in
-       {accum = l_e.accum / r_e.accum; symbols = l_e.symbols}
+       {accum = l_e.accum / r_e.accum; symbols = new_syms}
     )
   | Ast.UnaryOp u ->
     (match u.token with
