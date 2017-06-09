@@ -147,6 +147,10 @@ let parseR = parseToken Token.RParen
 let parse_parens = andThen parseL parseR
 let parse_either = orElse parseL parseR
 
+let print_rule rule_name tokens =
+  print_endline rule_name;
+  print_endline (List.to_string ~f:(Token.to_string) tokens)
+
 let empty tokens =
   Ok(Ast.NoOp, tokens)
 
@@ -154,6 +158,7 @@ let empty tokens =
    statement: compound_statement | assignment_statement | empty
 *)
 let rec statement tokens =
+  print_rule "statement" tokens;
   match tokens with
   | Token.Begin :: tl ->
     compound_statement tokens
@@ -165,9 +170,11 @@ let rec statement tokens =
 statement_list : statement | statement SEMI statement_list
 *)
 and statement_list tokens =
+  print_rule "statement_list" tokens;
   let rec eat_list statements tokens =
     match tokens with
     | Token.Semi :: tl ->
+      Result.
       (match statement tl with
        | Ok (s, ts) -> eat_list (List.append statements [s]) ts
        | Error _ as e -> e)
@@ -186,11 +193,12 @@ and statement_list tokens =
 assignment_statement : variable ASSIGN expr
 *)
 and assignment_statement tokens =
+  print_rule "assignment_statement" tokens;
   match variable tokens with
   | Ok (left, tl) ->
     (match tl with
-     | Token.Assign as token :: _ ->
-       (match expr tl with
+     | Token.Assign as token :: the_rest ->
+       (match expr the_rest with
         | Ok (right, tls) ->
           Ok (Ast.Assign {left = left; right =  right; token = token}, tls)
         | Error _ as e -> e)
@@ -202,6 +210,7 @@ and assignment_statement tokens =
 *)
 (* and variable tokens : (Ast.t * Token.t list, string) Core.Std.Result.t = *)
 and variable tokens =
+  print_rule "variable" tokens;
   match tokens with
   | (Token.Id s as t) :: tl -> Ok (Ast.Var {token = t; value = s}, tl)
   | _ -> Error "next token should be an Id"
@@ -210,6 +219,7 @@ and variable tokens =
 compound_statement : BEGIN statement_list END
 *)
 and compound_statement tokens =
+  print_rule "compound_statement" tokens;
   match tokens with
   | Token.Begin :: tl ->
     (match statement_list tl with
@@ -223,6 +233,7 @@ and compound_statement tokens =
 program : compound_statement DOT
 *)
 and program tokens =
+  print_rule "program" tokens;
   match compound_statement tokens with
   | Ok(c, tl) -> (match tl with
       | Token.Dot :: _ -> Ok (c, [])
@@ -236,6 +247,7 @@ factor : (PLUS | MINUS) factor
         | variable
 *)
 and factor tokens =
+  print_rule "factor" tokens;
   match tokens with
   | Token.Operator o :: tl when not (is_term_op o) ->
     (match factor tl with
@@ -256,13 +268,14 @@ and factor tokens =
      | Ok (_, []) -> Error "The list of tokens is empty"
     )
   | Token.Id _ :: _ -> variable tokens
-  | _ :: _ -> Error "next token is not part of a factor"
+  | hd :: _ -> Error (Printf.sprintf "next token %s is not part of a factor" (Token.to_string hd))
   | [] -> Error "no remaining tokens to factor"
 
 (*
 term : factor ((MUL | DIV) factor)*
 *)
 and term tokens =
+  print_rule "term" tokens;
   let term' node t =
     match t with
     | Token.Operator o :: tl when is_term_op o ->
@@ -282,6 +295,7 @@ and term tokens =
 expr: term ((PLUS|MINUS) term)*
 *)
 and expr tokens =
+  print_rule "expr" tokens;
   let rec expr' node t =
     match t with
     | Token.Operator o :: tl when not (is_term_op o) ->

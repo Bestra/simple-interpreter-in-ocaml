@@ -11,16 +11,16 @@ let is_alphanum = function
   | _ -> false
 
 let rec parse_integer int_str chars =
+  print_string int_str;
   match chars with
   | c :: tl when is_digit c ->
     parse_integer (int_str ^ (Char.escaped c)) tl
   | _ -> (Token.Integer (int_of_string int_str), chars)
 
-
 let rec parse_id str chars =
   match chars with
   | c :: tl when is_alphanum c ->
-    parse_integer (str ^ (Char.escaped c)) tl
+    parse_id (str ^ (Char.escaped c)) tl
   | _ ->
     (match str with
      | "BEGIN" -> (Token.Begin, chars)

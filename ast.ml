@@ -13,6 +13,6 @@ let rec to_string = function
   | BinOp b -> "(" ^ (to_string b.left) ^ " " ^ (Token.Operator.to_string b.token) ^ " "^ (to_string b.right) ^ ")"
   | UnaryOp u -> "(" ^ (Token.Operator.to_string u.token) ^ " " ^ (to_string u.expr) ^ " )"
   | Compound c -> "Compund"
-  | Assign a -> "Assign"
-  | Var v -> "Var"
+  | Assign a -> Printf.sprintf "Assign %s to %s" (to_string a.left) (to_string a.right)
+  | Var v -> Printf.sprintf "Var %s" v.value
   | NoOp -> "NoOp"
