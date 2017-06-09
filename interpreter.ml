@@ -3,6 +3,14 @@ open Core.Std
 type symbol_table = int String.Map.t
 type state = {accum: int; symbols: int String.Map.t}
 
+let print_symbols (syms: int String.Map.t) =
+  let sexp =
+  List.sexp_of_t
+    (fun (k, v) -> Sexp.List [Sexp.Atom k; Sexp.Atom (Int.to_string v)] )
+    (String.Map.to_alist syms)
+  in
+  Sexp.to_string sexp
+
 let interpret text =
   printf "you input %s" text;
   print_newline ();
@@ -17,13 +25,19 @@ let rec visit ast (env: state) : state =
   | Ast.Compound c ->
     List.fold c.children ~init:env ~f:(fun acc child ->
         let new_env = visit child env in
-        let new_symbols = Map.merge env.symbols new_env.symbols ~f:(fun ~key r ->
+        print_endline "existing symbols";
+        print_endline (print_symbols acc.symbols);
+        print_endline "incoming symbols";
+        print_endline (print_symbols new_env.symbols);
+        let new_symbols = Map.merge acc.symbols new_env.symbols ~f:(fun ~key r ->
             match r with
             | `Left v -> Some v
             | `Right v -> Some v
             | `Both (a, b) -> Some b)
         in
-        {accum = env.accum; symbols = new_symbols}
+        print_endline "merged symbols";
+        print_endline (print_symbols new_symbols);
+        {accum = acc.accum; symbols = new_symbols}
       )
 
   | Ast.Assign a ->
@@ -31,6 +45,8 @@ let rec visit ast (env: state) : state =
      | Ast.Var v ->
        let new_state = (visit a.right env) in
        let new_symbols = Map.add env.symbols ~key:v.value ~data:(new_state.accum) in
+       print_endline "assign";
+       print_endline (print_symbols new_symbols);
        {accum = env.accum; symbols = new_symbols}
      | _ -> failwith "assigments must start with a variable"
     )
@@ -70,7 +86,7 @@ let rec visit ast (env: state) : state =
 
 let eval_ast an_ast : string =
   let final_state = visit an_ast {accum = 0; symbols = String.Map.empty} in
-  Sexp.to_string (String.Map.sexp_of_t (fun i -> Sexp.Atom (Int.to_string i)) final_state.symbols)
+  print_symbols final_state.symbols
 
 let rec read_and_interpret () =
   let line = In_channel.input_line In_channel.stdin in
