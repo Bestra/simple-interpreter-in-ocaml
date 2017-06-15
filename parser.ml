@@ -174,7 +174,6 @@ and statement_list tokens =
   let rec eat_list statements tokens =
     match tokens with
     | Token.Semi :: tl ->
-      Result.
       (match statement tl with
        | Ok (s, ts) -> eat_list (List.append statements [s]) ts
        | Error _ as e -> e)
