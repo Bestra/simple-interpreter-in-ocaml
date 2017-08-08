@@ -58,7 +58,7 @@ and assignment_statement tokens =
      | Token.Assign as token :: the_rest ->
        (match expr the_rest with
         | Ok (right, tls) ->
-          Ok (Ast.Assign {left = left; right =  right; token = token}, tls)
+          Ok (Ast.Assign {left; right; token}, tls)
         | Error _ as e -> e)
      | _ -> Error "variable needs to have an assign afterwards")
   | Error _ as e -> e
@@ -70,7 +70,7 @@ and assignment_statement tokens =
 and variable tokens =
   print_rule "variable" tokens;
   match tokens with
-  | (Token.Id s as t) :: tl -> Ok (Ast.Var {token = t; value = s}, tl)
+  | (Token.Id value  as token) :: tl -> Ok (Ast.Var {token; value}, tl)
   | _ -> Error "next token should be an Id"
 
 (*
@@ -86,7 +86,8 @@ and compound_statement tokens =
            Ok (Ast.Compound {children = nodes}, ts')
          | _ -> Error "compound statements must end with End")
      | Error _ as e -> e)
-  | _ -> Error "compound statements must begin with Begin"
+  | some_token :: _ -> Error (Printf.sprintf "compound statements must begin with 'Begin', not %s" (Token.to_string some_token))
+  | _ -> Error "empty list, or something else bad"
 (*
 program : compound_statement DOT
 *)

@@ -35,8 +35,8 @@ let to_string token =
   | Dot -> "."
   | Assign -> ":="
   | Semi -> ";"
-  | Id i -> i
-  | Unknown c -> Char.escaped c
+  | Id i -> Printf.sprintf "Id: %s" i
+  | Unknown c -> Printf.sprintf "Unknown: %s" (Char.escaped c)
 
 let of_char = function
   | '0'..'9' as c -> Integer (int_of_string (Char.escaped c))
