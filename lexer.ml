@@ -5,8 +5,8 @@ let is_digit = function
   | _ -> false
 
 let is_alphanum = function
-  | '0'..'9' -> true
-  | 'a'..'z' -> true
+  | '0'..'9'
+  | 'a'..'z'
   | 'A'..'Z' -> true
   | _ -> false
 
@@ -15,7 +15,7 @@ let rec parse_integer int_str chars =
   match chars with
   | c :: tl when is_digit c ->
     parse_integer (int_str ^ (Char.escaped c)) tl
-  | _ -> (Token.Integer (int_of_string int_str), chars)
+  | _ -> (Token.IntegerConst (int_of_string int_str), chars)
 
 let rec parse_id str chars =
   match chars with
@@ -33,8 +33,6 @@ let parse chars =
   match chars with
   | [] -> Token.EOF, chars (* shouldn't happen *)
   | ':' :: '=' :: tl -> (Token.Assign, tl)
-  | ';' :: tl -> (Token.Semi, tl)
-  | '.' :: tl -> (Token.Dot, tl)
   | hd :: tl when is_digit hd ->
       parse_integer (Char.escaped hd) tl
   | hd :: tl when is_alphanum hd ->

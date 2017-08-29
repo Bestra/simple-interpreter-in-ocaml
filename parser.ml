@@ -19,9 +19,9 @@ let empty tokens =
 let rec statement tokens =
   print_rule "statement" tokens;
   match tokens with
-  | Token.Begin :: tl ->
+  | Token.Begin :: _ ->
     compound_statement tokens
-  | Token.Id _ :: tl ->
+  | Token.Id _ :: _ ->
     assignment_statement tokens
   | _ -> empty tokens
 
@@ -42,7 +42,7 @@ and statement_list tokens =
   | Ok (s, tl) ->
     (match eat_list [s] tl with
      | Ok (statements, ts) -> (match ts with
-         | Token.Id i :: _ -> Error "can't have an id after statements"
+         | Token.Id _ :: _ -> Error "can't have an id after statements"
          | _ -> Ok (statements, ts))
      | Error _ as e -> e)
   | Error _ as e -> e
@@ -66,12 +66,75 @@ and assignment_statement tokens =
 (*
    variable: ID
 *)
-(* and variable tokens : (Ast.t * Token.t list, string) Core.Std.Result.t = *)
 and variable tokens =
   print_rule "variable" tokens;
   match tokens with
   | (Token.Id value  as token) :: tl -> Ok (Ast.Var {token; value}, tl)
   | _ -> Error "next token should be an Id"
+
+(*
+block: declarations compound_statement
+*)
+and block tokens =
+  print_rule "block" tokens;
+  match declarations tokens with
+  | Ok (decs, tl) ->
+    (match compound_statement tl with
+     | Ok(statement, tl) -> Ok (Ast.Block {declarations = decs; compound_statement = statement}, tl)
+     | Error _ as e -> e
+    )
+  | Error _ as e -> e
+
+(*
+declarations: VAR (variable_declaration SEMI)+
+              | empty
+*)
+and declarations tokens =
+  print_rule "declarations" tokens;
+  let rec parse_declarations (token_list: Token.t list) (acc: Ast.t list) =
+    (match token_list with
+     | Token.Id _ :: tl ->
+       (match variable_declaration tl with
+        | Ok (new_declarations, tl') ->
+          parse_declarations tl' (List.append new_declarations acc)
+        | Error _ as e -> e
+       )
+     | _ -> Ok (acc, token_list)
+    )
+  in
+  match tokens with
+  | Token.Var :: tl ->
+    (match parse_declarations tl [] with
+     | Ok (_, _) as o -> o
+     | Error _ as e -> e
+    )
+  | _ -> Error "fixme"
+
+(*
+variable_declaration : ID (COMMA ID)* COLON type_spec
+*)
+and variable_declaration tokens : (Ast.t list * Token.t list, string) Core.Std.Result.t =
+  print_rule "declarations" tokens;
+  match tokens with
+  | (Token.Id first_id as first_token) :: tl ->
+    let rec eat_ids t acc =
+      (match t with
+       | Token.Comma :: (Token.Id i as token) :: tl' ->
+         eat_ids tl' ((Ast.Var {token; value = i}) :: acc)
+       | _ -> (acc, t)
+      ) in
+    let (new_vars, tl') = eat_ids tl [Ast.Var {token = first_token; value = first_id}]
+    in
+    Ok (new_vars, tl')
+  | _ -> Error "variable_declaration needs a id token"
+
+(*
+type_spec : INTEGER | REAL
+*)
+and type_spec = function
+  | Token.IntegerType as token :: _ -> Ok (Ast.Type {token})
+  | Token.RealType as token :: _ -> Ok (Ast.Type {token})
+  | _ -> Error "incorrect token for AST.Type"
 
 (*
 compound_statement : BEGIN statement_list END
@@ -89,19 +152,30 @@ and compound_statement tokens =
   | some_token :: _ -> Error (Printf.sprintf "compound statements must begin with 'Begin', not %s" (Token.to_string some_token))
   | _ -> Error "empty list, or something else bad"
 (*
-program : compound_statement DOT
+program : PROGRAM variable SEMI block DOT
 *)
-and program tokens =
-  print_rule "program" tokens;
-  match compound_statement tokens with
-  | Ok(c, tl) -> (match tl with
-      | Token.Dot :: _ -> Ok (c, [])
-      | _ -> Error "Programs must end with a Dot")
-  | Error _ as e -> e
+and program = function
+  | Token.Program :: tl ->
+    (match variable tl with
+     | Ok (Ast.Var v, tl') ->
+       (match tl' with
+        | Token.Semi :: tl'' ->
+          (match block tl'' with
+           | Ok (b, Token.Dot :: the_rest) ->
+             Ok (Ast.Program {name = v.value; block = b}, the_rest)
+           | Ok (_, _) -> Error "syntax error"
+           | Error _ as e -> e
+      )
+        | _ -> Error "syntax error")
+     | Ok (_, _) -> Error "syntax error"
+     | Error _ as e -> e)
+  | _ -> Error "programs must start with PROGRAM"
 
 (*
-factor : (PLUS | MINUS) factor
-        | INTEGER
+factor :  PLUS factor
+        | MINUS factor
+        | INTEGER_CONST
+        | REAL_CONST
         | LPAREN expr RPAREN
         | variable
 *)
@@ -110,11 +184,11 @@ and factor tokens =
   match tokens with
   | Token.Operator o :: tl when not (is_term_op o) ->
     (match factor tl with
-    | Ok (new_factor, ts) ->
-      Ok (Ast.UnaryOp {token = o; expr = new_factor}, ts)
-    | Error _ as e -> e
+      | Ok (new_factor, ts) ->
+        Ok (Ast.UnaryOp {token = o; expr = new_factor}, ts)
+      | Error _ as e -> e
     )
-  | Token.Integer i as t :: tl ->
+  | Token.IntegerConst i as t :: tl ->
     printf "factor %i" i;
     print_newline (); Ok (Ast.Number {token = t; value = i}, tl)
   | Token.LParen :: tl ->
