@@ -1,4 +1,5 @@
 open Core.Std
+open Core.Std.Result.Let_syntax
 
 let is_term_op = function
   | Token.Operator.Plus
@@ -33,35 +34,27 @@ and statement_list tokens =
   let rec eat_list statements tokens =
     match tokens with
     | Token.Semi :: tl ->
-      (match statement tl with
-       | Ok (s, ts) -> eat_list (List.append statements [s]) ts
-       | Error _ as e -> e)
+      let%bind (s, ts) = statement tl in
+      eat_list (List.append statements [s]) ts
     | _ -> Ok (statements, tokens)
   in
-  match statement tokens with
-  | Ok (s, tl) ->
-    (match eat_list [s] tl with
-     | Ok (statements, ts) -> (match ts with
-         | Token.Id _ :: _ -> Error "can't have an id after statements"
-         | _ -> Ok (statements, ts))
-     | Error _ as e -> e)
-  | Error _ as e -> e
+  let%bind (s, tl) = (statement tokens) in
+  let%bind (statements, ts) = (eat_list [s] tl) in
+  (match ts with
+   | Token.Id _ :: _ -> Error "can't have an id after statements"
+   | _ -> Ok (statements, ts))
 
 (*
 assignment_statement : variable ASSIGN expr
 *)
 and assignment_statement tokens =
   print_rule "assignment_statement" tokens;
-  match variable tokens with
-  | Ok (left, tl) ->
-    (match tl with
-     | Token.Assign as token :: the_rest ->
-       (match expr the_rest with
-        | Ok (right, tls) ->
-          Ok (Ast.Assign {left; right; token}, tls)
-        | Error _ as e -> e)
-     | _ -> Error "variable needs to have an assign afterwards")
-  | Error _ as e -> e
+  let%bind (left, tl) = variable tokens in
+  (match tl with
+   | Token.Assign as token :: the_rest ->
+     let%map (right, tls) = expr the_rest in
+     (Ast.Assign {left; right; token}, tls)
+   | _ -> Error "variable needs to have an assign afterwards")
 
 (*
    variable: ID
@@ -77,13 +70,9 @@ block: declarations compound_statement
 *)
 and block tokens =
   print_rule "block" tokens;
-  match declarations tokens with
-  | Ok (decs, tl) ->
-    (match compound_statement tl with
-     | Ok(statement, tl) -> Ok (Ast.Block {declarations = decs; compound_statement = statement}, tl)
-     | Error _ as e -> e
-    )
-  | Error _ as e -> e
+  let%bind (decs, tl) = declarations tokens in
+  let%bind (statement, tl') = compound_statement tl in
+  Ok (Ast.Block {declarations = decs; compound_statement = statement}, tl')
 
 (*
 declarations: VAR (variable_declaration SEMI)+
@@ -94,20 +83,13 @@ and declarations tokens =
   let rec parse_declarations (token_list: Token.t list) (acc: Ast.t list) =
     (match token_list with
      | Token.Id _ :: tl ->
-       (match variable_declaration tl with
-        | Ok (new_declarations, tl') ->
-          parse_declarations tl' (List.append new_declarations acc)
-        | Error _ as e -> e
-       )
+       let%bind (new_declarations, tl') = variable_declaration tl in
+       parse_declarations tl' (List.append new_declarations acc)
      | _ -> Ok (acc, token_list)
     )
   in
   match tokens with
-  | Token.Var :: tl ->
-    (match parse_declarations tl [] with
-     | Ok (_, _) as o -> o
-     | Error _ as e -> e
-    )
+  | Token.Var :: tl -> parse_declarations tl []
   | _ -> Error "fixme"
 
 (*
@@ -123,8 +105,7 @@ and variable_declaration tokens : (Ast.t list * Token.t list, string) Core.Std.R
          eat_ids tl' ((Ast.Var {token; value = i}) :: acc)
        | _ -> (acc, t)
       ) in
-    let (new_vars, tl') = eat_ids tl [Ast.Var {token = first_token; value = first_id}]
-    in
+    let (new_vars, tl') = eat_ids tl [Ast.Var {token = first_token; value = first_id}] in
     Ok (new_vars, tl')
   | _ -> Error "variable_declaration needs a id token"
 
@@ -143,12 +124,11 @@ and compound_statement tokens =
   print_rule "compound_statement" tokens;
   match tokens with
   | Token.Begin :: tl ->
-    (match statement_list tl with
-     | Ok (nodes, ts) -> (match ts with
-         | Token.End :: ts' ->
-           Ok (Ast.Compound {children = nodes}, ts')
-         | _ -> Error "compound statements must end with End")
-     | Error _ as e -> e)
+    let%bind (nodes, ts) = statement_list tl in
+     (match ts with
+       | Token.End :: ts' ->
+         Ok (Ast.Compound {children = nodes}, ts')
+       | _ -> Error "compound statements must end with End")
   | some_token :: _ -> Error (Printf.sprintf "compound statements must begin with 'Begin', not %s" (Token.to_string some_token))
   | _ -> Error "empty list, or something else bad"
 (*
@@ -156,19 +136,17 @@ program : PROGRAM variable SEMI block DOT
 *)
 and program = function
   | Token.Program :: tl ->
-    (match variable tl with
-     | Ok (Ast.Var v, tl') ->
+    (match%bind variable tl with
+     | (Ast.Var v, tl') ->
        (match tl' with
         | Token.Semi :: tl'' ->
-          (match block tl'' with
-           | Ok (b, Token.Dot :: the_rest) ->
+          (match%bind block tl'' with
+           | (b, Token.Dot :: the_rest) ->
              Ok (Ast.Program {name = v.value; block = b}, the_rest)
-           | Ok (_, _) -> Error "syntax error"
-           | Error _ as e -> e
-      )
+           | _ -> Error "syntax error"
+          )
         | _ -> Error "syntax error")
-     | Ok (_, _) -> Error "syntax error"
-     | Error _ as e -> e)
+     | _ -> Error "syntax error")
   | _ -> Error "programs must start with PROGRAM"
 
 (*
@@ -183,22 +161,19 @@ and factor tokens =
   print_rule "factor" tokens;
   match tokens with
   | Token.Operator o :: tl when not (is_term_op o) ->
-    (match factor tl with
-      | Ok (new_factor, ts) ->
-        Ok (Ast.UnaryOp {token = o; expr = new_factor}, ts)
-      | Error _ as e -> e
-    )
+    let%map (new_factor, tl') = (factor tl) in
+    (Ast.UnaryOp {token = o; expr = new_factor}, tl')
   | Token.IntegerConst i as t :: tl ->
     printf "factor %i" i;
     print_newline (); Ok (Ast.Number {token = t; value = i}, tl)
   | Token.LParen :: tl ->
     print_endline "found a left paren";
     (match expr tl with
-     | Error _ as e -> e
      | Ok (res, Token.RParen :: ts) ->
        Ok (res, ts)
      | Ok (_, hd :: _) -> Error (Printf.sprintf "next token %s is not an right paren" (Token.to_string hd))
      | Ok (_, []) -> Error "The list of tokens is empty"
+     | Error _ as e -> e
     )
   | Token.Id _ :: _ -> variable tokens
   | hd :: _ -> Error (Printf.sprintf "next token %s is not part of a factor" (Token.to_string hd))
@@ -213,16 +188,11 @@ and term tokens =
     match t with
     | Token.Operator o :: tl when is_term_op o ->
       printf "term op %s" (Token.Operator.to_string o); print_newline();
-      (match factor tl with
-       | Ok (next_factor_result, ts) ->
-         Ok (Ast.BinOp {token = o; left = node; right = next_factor_result}, ts)
-       | Error _ as e -> e
-      )
+      let%map (next_factor_result, ts) = factor tl in
+      (Ast.BinOp {token = o; left = node; right = next_factor_result}, ts)
     | _ -> Ok (node, t)
   in
-  match factor tokens with
-  | Ok (n, t) -> term' n t
-  | Error _ as e -> e
+  let%bind (n, t) = factor tokens in term' n t
 
 (*
 expr: term ((PLUS|MINUS) term)*
@@ -233,17 +203,13 @@ and expr tokens =
     match t with
     | Token.Operator o :: tl when not (is_term_op o) ->
       printf "expr op %s" (Token.Operator.to_string o); print_newline();
-      (match term tl with
-       | Ok (next_term_result, ts) ->
-         expr' (Ast.BinOp {token = o; left = node; right = next_term_result}) ts
-       | Error _ as e -> e
-      )
+      let%bind (next_term_result, ts) = term tl in
+      expr' (Ast.BinOp {token = o; left = node; right = next_term_result}) ts
     | _ :: _ -> Ok (node, t)
     | [] -> Ok (node, [])
   in
-  match term tokens with
-  | Ok (ast, remaining_tokens) -> expr' ast remaining_tokens
-  | Error _ as e -> e
+  let%bind (ast, remaining_tokens) = term tokens in
+  expr' ast remaining_tokens
 
 let parse text =
   printf "you input %s" text;
